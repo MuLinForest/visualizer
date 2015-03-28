@@ -1,17 +1,15 @@
 #!/usr/bin/env python
 
-# Copyright (C) 2013 National Cheng Kung University, Taiwan
-# All rights reserved.
-
 # Configure wether to trace these feature
 # Warning : Too many contents may freeze Grasp
 TRACE_QUEUE = True
 TRACE_MUTEX = True
 TRACE_BINARY_SEMAPHORE = False
-TRACE_INTERRUPT = False
+TRACE_INTERRUPT = True
 
 log = open('log', 'r')
 lines = log.readlines()
+context_switch_time = open('CST','w');
 
 tasks = {}
 events = []
@@ -23,24 +21,27 @@ queues = {}
 for line in lines :
 	line = line.strip()
 	inst, args = line.split(' ', 1)
-	
+
 	if inst == 'task' :
 		id, priority, name = args.split(' ', 2)
-		
+
 		task = {}
 		task['no'] = str(len(tasks) + 1)
 		task['priority'] = int(priority)
 		task['name'] = task['no'] + ": " + name.strip()
 		task['created'] = True
-		
+
 		tasks[id] = task
-		
+
 	elif inst == 'switch' :
 		out_task, in_task, tick, tick_reload, out_minitick, in_minitick = args.split(' ')
-		
-		out_time = (int(tick) + (int(tick_reload) - int(out_minitick)) / int(tick_reload)) / 100 * 1000;
-		in_time  = (int(tick) + (int(tick_reload) - int(in_minitick))  / int(tick_reload)) / 100 * 1000;
-		
+
+		out_time = (float(tick) + (float(tick_reload) - float(out_minitick)) / float(tick_reload)) / 100 * 1000;
+		in_time  = (float(tick) + (float(tick_reload) - float(in_minitick))  / float(tick_reload)) / 100 * 1000;
+
+		context_switch_time.write('From %d to %d,in_time = %f, out_time = %f, the context switch time is : %f ms\n' % (int(out_task),int(in_task),float(in_time),float(out_time),float(float(in_time)-float(out_time))))
+
+
 		event = {}
 		event['type'] = 'task out'
 		event['task'] = out_task
@@ -121,7 +122,7 @@ for line in lines :
 					tasks[task_id] = task
 
 				events.append(event);
-		
+
 		elif act == 'block' :
 			time, task_id, id = args.split(' ')
 			if id in all_queues and all_queues[id]['type'] == 'binary semaphore':
@@ -231,7 +232,7 @@ for event in events :
 	elif event['type'] == 'interrupt out' :
 		grasp.write('plot %f jobCompleted job%s.1\n' % (event['time'], event['task']))
 		grasp.write('plot %f jobResumed job%s.1\n' % (event['time'], event['prev']))
-		
+
 # Clean up unended operations
 
 for id in mutexes :
